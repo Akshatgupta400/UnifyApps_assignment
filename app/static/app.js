@@ -496,7 +496,7 @@ async function checkHealth() {
   try {
     const h = await (await api("/api/health")).json();
     if (!h.llm_ready) {
-      showBanner(`The language model isn't configured, so questions can't be answered yet. Set <code>LLM_MODEL</code> and the provider's API key (for example <code>OPENAI_API_KEY</code>) in <code>.env</code>, then restart the server. Details: ${esc(h.llm_error)}`);
+      showBanner(`The language model isn't configured, so questions can't be answered yet. Set <code>LLM_MODEL</code> and the provider's API key (for example <code>GROQ_API_KEY</code>) in <code>.env</code>, then restart the server. Details: ${esc(h.llm_error)}`);
     }
   } catch (e) {
     showBanner("Can't reach the server. Check that it is running, then reload the page.");

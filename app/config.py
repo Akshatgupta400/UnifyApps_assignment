@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 @dataclass
 class Settings:
     database_path: Path = ROOT / "data" / "sample.db"
-    llm_model: str = "openai:gpt-4o-mini"
+    llm_model: str = "groq:openai/gpt-oss-120b"
     llm_temperature: float = 0.0
     max_result_rows: int = 200          # rows shown in the UI per query
     max_export_rows: int = 10_000       # rows written to a CSV export

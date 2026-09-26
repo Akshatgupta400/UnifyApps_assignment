@@ -5,40 +5,108 @@ database. Ask a question in plain English and get a validated, read-only SQL que
 results. You can also paste SQL to have it explained, debugged or optimised. Anything that is not about SQL or this database
 is refused.
 
+**Demo video:** _link to be added_
+
 ![Architecture](docs/architecture.png)
 
-## Quick start
+## Setup
 
-Requires Python 3.10+ and an API key for one LLM provider (OpenAI by default).
+### Prerequisites
+
+- **Python 3.10 or newer.** Check with `python3 --version`. Tested on 3.11 and 3.12.
+- **Git**, to clone the repository.
+- **An LLM API key.** The default is [Groq](https://console.groq.com), which has a free tier and needs no credit card.
+  OpenAI, Anthropic and Gemini also work (see [Using a different model](#using-a-different-model)).
+
+### 1. Clone the repository
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-cp .env.example .env               # then put your key in .env: OPENAI_API_KEY=sk-...
-python run.py                      # open http://localhost:8000
+git clone https://github.com/Akshatgupta400/UnifyApps_assignment.git
+cd UnifyApps_assignment
 ```
 
-The sample database (`data/sample.db`) is created and seeded automatically on first start. To rebuild it: `python -m app.db.seed`.
+### 2. Create a virtual environment and install dependencies
+
+macOS / Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### 3. Get a Groq API key
+
+1. Sign up at [console.groq.com](https://console.groq.com).
+2. Open **API Keys** → **Create API Key** and copy the key (it starts with `gsk_`).
+
+### 4. Configure `.env`
+
+```bash
+cp .env.example .env               # Windows: copy .env.example .env
+```
+
+Open `.env` and replace `gsk_...` with your key:
+
+```ini
+GROQ_API_KEY=gsk_your_key_here
+LLM_MODEL=groq:openai/gpt-oss-120b
+```
+
+`.env` is listed in `.gitignore`, so the key is never committed.
+
+### 5. Run the app
+
+```bash
+python run.py
+```
+
+Open **http://localhost:8000**. On first start the sample database (`data/sample.db`) is created and seeded automatically;
+to rebuild it later, run `python -m app.db.seed`. Stop the server with <kbd>Ctrl</kbd>+<kbd>C</kbd>.
+
+### 6. Check it works
+
+- **http://localhost:8000/api/health** should show `"llm_ready": true` and the model name.
+- In the UI, ask *"Show all customers"*, then *"Only those from California"*. The second answer should add
+  `WHERE State = 'CA'` to the first query and return 55 rows.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Yellow banner "The language model isn't configured" | `.env` is missing, or the key is wrong. Check `/api/health` for details, then restart the server. |
+| `model ... does not exist or you do not have access to it` | Groq retires models over time. List the models your key can use with `curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"`, and set `LLM_MODEL=groq:<model id>`. |
+| `Address already in use` | Another program is using port 8000. Set `PORT=8001` in `.env`, or stop the other program. |
+| `ModuleNotFoundError` | The virtual environment isn't active. Run `source .venv/bin/activate` (or run `.venv/bin/python run.py` directly). |
+| `python: command not found` (macOS) | Use `python3`. Inside an activated virtual environment, `python` works. |
 
 ### Using a different model
 
-The model is any `provider:model` string understood by LangChain's `init_chat_model`. Install the provider package and set the key:
+The model is any `provider:model` string understood by LangChain's `init_chat_model`. Install the provider package if needed and
+set its key in `.env`:
 
 | Provider | Install | `.env` |
 |---|---|---|
-| OpenAI (default) | included | `OPENAI_API_KEY=...`, `LLM_MODEL=openai:gpt-4o-mini` |
-| Groq (free tier) | `pip install langchain-groq` | `GROQ_API_KEY=...`, `LLM_MODEL=groq:openai/gpt-oss-120b` |
+| Groq (default, free tier) | included | `GROQ_API_KEY=...`, `LLM_MODEL=groq:openai/gpt-oss-120b` |
+| OpenAI | included | `OPENAI_API_KEY=...`, `LLM_MODEL=openai:gpt-4o-mini` |
 | Anthropic | `pip install langchain-anthropic` | `ANTHROPIC_API_KEY=...`, `LLM_MODEL=anthropic:claude-sonnet-4-5` |
 | Google Gemini | `pip install langchain-google-genai` | `GOOGLE_API_KEY=...`, `LLM_MODEL=google_genai:gemini-2.0-flash` |
 
-Without a key the server still starts; the UI shows a banner explaining what to configure.
+Without a key the server still starts, and the UI shows a banner explaining what to configure.
 
-### Docker
+### Docker (alternative to steps 2 and 5)
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/). Do steps 1, 3 and 4 first, then:
 
 ```bash
-cp .env.example .env               # add your API key
 docker compose up --build          # http://localhost:8000
 ```
 
@@ -49,7 +117,7 @@ pip install -r requirements-dev.txt
 pytest                             # or: python -m unittest discover -s tests -t .
 ```
 
-89 tests, no network or API key needed: the LLM is replaced by a scripted fake (`tests/fakes.py`), and each test uses a fresh temporary
+92 tests, no network or API key needed: the LLM is replaced by a scripted fake (`tests/fakes.py`), and each test uses a fresh temporary
 copy of the seeded database.
 
 | File | Covers |
@@ -59,6 +127,7 @@ copy of the seeded database.
 | `test_guards.py` | prompt-injection patterns, destructive SQL detection, SQL extraction from messages |
 | `test_graph.py` | the LangGraph workflow end to end: NL→SQL, automatic repair of invalid SQL, follow-up refinement, explain / debug / optimize, all refusal paths, clarifying questions, LLM outage |
 | `test_api.py` | HTTP endpoints, SSE streaming, sessions, CSV export re-validation |
+| `test_llm.py` | structured-output handling when a model omits empty fields |
 
 ## What it does
 
