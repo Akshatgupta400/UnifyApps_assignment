@@ -16,4 +16,5 @@ RUN python -m app.db.seed
 
 EXPOSE 8000
 # One worker keeps the in-memory conversation store consistent; threads give concurrency.
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "8", "--timeout", "120", "run:app"]
+# Hosting platforms (Render, Railway, Fly.io...) pass the port in $PORT; 8000 locally.
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 8 --timeout 120 run:app"]

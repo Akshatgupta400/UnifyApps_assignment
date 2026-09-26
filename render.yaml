@@ -1,0 +1,15 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# New > Blueprint > pick this repo; Render asks for GROQ_API_KEY during setup.
+services:
+  - type: web
+    name: sql-agent
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false          # secret: entered in the Render dashboard, never committed
+      - key: LLM_MODEL
+        value: groq:openai/gpt-oss-120b
+      - key: AUTO_EXECUTE
+        value: "true"

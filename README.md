@@ -110,6 +110,20 @@ Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/). Do s
 docker compose up --build          # http://localhost:8000
 ```
 
+### Deploying to the web (Render)
+
+The repo includes a [Render](https://render.com) Blueprint (`render.yaml`) that builds the Dockerfile on Render's free plan.
+
+1. Push the repo to GitHub and sign in to Render with GitHub.
+2. **New** → **Blueprint** → select this repository → **Apply**.
+3. When prompted, paste your `GROQ_API_KEY`. It is stored as a secret in Render, not in the repo.
+4. Wait for the build (a few minutes), then open the `https://<service>.onrender.com` URL. `/api/health` should show
+   `"llm_ready": true`.
+
+Each push to `main` redeploys automatically. On the free plan the service sleeps after 15 minutes without traffic, so the
+first request after that takes about a minute. Conversations are kept in memory and reset on each restart or redeploy.
+The container reads the port from `$PORT`, so the same image also runs on Railway, Fly.io or any Docker host.
+
 ### Tests
 
 ```bash
