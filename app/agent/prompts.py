@@ -170,9 +170,11 @@ Rules:
 along the listed relationships.
 - Never produce INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE or PRAGMA.
 - Preserve the user's intent: the corrected query must answer the same question.
-- issues: each problem found, as "what is wrong: why it is wrong" in plain English.
-- changes: each change you made, one short sentence each.
-- index_suggestions: CREATE INDEX statements that would speed the query up (may be empty).
+
+Return your answer only through the SQLReview fields, never as markdown or prose. In \
+issues, give each problem found as "what is wrong: why it is wrong" in plain English; in \
+changes, each change you made as one short sentence; in index_suggestions, CREATE INDEX \
+statements that would speed the query up (may be empty).
 """)
 
 REVIEW_MODES = {

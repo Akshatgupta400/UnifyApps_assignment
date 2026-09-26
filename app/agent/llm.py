@@ -62,26 +62,31 @@ class LangChainLLM:
         from langchain_core.messages import HumanMessage, SystemMessage
         return [SystemMessage(content=system), HumanMessage(content=user)]
 
-    def structured(self, system: str, user: str, schema: dict[str, Any]) -> dict[str, Any]:
-        key = schema["title"]
+    # Tool/function calling is the most widely supported structured-output mode
+    # (OpenAI, Anthropic, Groq, Gemini, Ollama), but a model can still answer in
+    # prose instead of calling the tool. The provider's native JSON-schema mode
+    # constrains decoding to the schema, so it is the fallback.
+    STRUCTURED_METHODS = ("function_calling", "json_schema")
+
+    def _structured_runnable(self, schema: dict[str, Any], method: str):
+        key = (schema["title"], method)
         if key not in self._structured_cache:
-            # Tool/function calling is the most widely supported structured-output
-            # mode across providers (OpenAI, Anthropic, Groq, Gemini, Ollama).
-            # "required" is enforced locally instead: some providers (e.g. Groq)
-            # reject the whole reply when a model omits a field that would be empty.
+            # "required" is enforced locally by fill_missing: some providers (e.g.
+            # Groq) reject the whole reply when a model omits a field that would be empty.
             relaxed = {k: v for k, v in schema.items() if k != "required"}
-            self._structured_cache[key] = self._model.with_structured_output(
-                relaxed, method="function_calling")
+            self._structured_cache[key] = self._model.with_structured_output(relaxed, method=method)
+        return self._structured_cache[key]
+
+    def structured(self, system: str, user: str, schema: dict[str, Any]) -> dict[str, Any]:
         last_exc: Exception | None = None
-        for _ in range(2):   # one retry: malformed tool calls are usually transient
+        for method in self.STRUCTURED_METHODS:
             try:
-                result = self._structured_cache[key].invoke(self._messages(system, user))
-            except Exception as exc:
+                result = self._structured_runnable(schema, method).invoke(self._messages(system, user))
+            except Exception as exc:   # includes providers that don't support a method
                 last_exc = exc
                 continue
             if isinstance(result, dict):
                 return fill_missing(result, schema)
-            last_exc = None
         if last_exc is not None:
             raise LLMError(f"The language model request failed: {last_exc}") from last_exc
         raise LLMError("The language model returned an unexpected response format.")
