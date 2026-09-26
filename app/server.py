@@ -18,6 +18,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import logging
 import threading
 import time
 import uuid
@@ -27,7 +28,7 @@ from typing import Any, Iterator
 from flask import Flask, Response, jsonify, request, send_from_directory
 
 from app.agent.graph import NODE_LABELS, build_graph
-from app.agent.llm import LangChainLLM, LLMClient, LLMError
+from app.agent.llm import FallbackLLM, LangChainLLM, LLMClient, LLMError
 from app.agent.state import new_turn
 from app.config import ROOT, Settings
 from app.db.introspect import load_schema
@@ -97,9 +98,23 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None) -
     llm_error = ""
     if llm is None:
         try:
-            llm = LangChainLLM(settings.llm_model, settings.llm_temperature)
+            # With a fallback configured, fail fast instead of letting the SDK sit
+            # out a rate limit; the fallback model answers instead.
+            llm = LangChainLLM(settings.llm_model, settings.llm_temperature,
+                               max_retries=0 if settings.llm_fallback_models else None)
         except LLMError as exc:
             llm_error = str(exc)   # the UI still loads and shows how to fix this
+        else:
+            fallbacks = []
+            last = len(settings.llm_fallback_models) - 1
+            for i, name in enumerate(settings.llm_fallback_models):
+                try:
+                    fallbacks.append(LangChainLLM(name, settings.llm_temperature,
+                                                  max_retries=None if i == last else 0))
+                except LLMError:   # a broken fallback must not take the main model down
+                    logging.getLogger(__name__).warning("Fallback model %s could not be initialised", name)
+            if fallbacks:
+                llm = FallbackLLM([llm, *fallbacks])
     graph = build_graph(llm, schema, settings, llm_error=llm_error)
     sessions = SessionStore()
 

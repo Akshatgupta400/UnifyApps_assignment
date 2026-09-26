@@ -27,10 +27,11 @@ def review(sql: str, issues=None, changes=None, indexes=None) -> dict:
 
 class FakeLLM:
     def __init__(self, text: str | Callable[[str, str], str] = "This query lists the requested rows.",
-                 fail: bool = False) -> None:
+                 fail: bool = False, fail_message: str = "simulated outage") -> None:
         self.queues: dict[str, deque] = defaultdict(deque)
         self.text_reply = text
         self.fail = fail
+        self.fail_message = fail_message
         self.calls: list[dict[str, Any]] = []
 
     def queue(self, title: str, *responses: dict) -> "FakeLLM":
@@ -40,7 +41,7 @@ class FakeLLM:
     def structured(self, system: str, user: str, schema: dict) -> dict:
         self.calls.append({"kind": schema["title"], "system": system, "user": user})
         if self.fail:
-            raise LLMError("simulated outage")
+            raise LLMError(self.fail_message)
         queue = self.queues[schema["title"]]
         if not queue:
             raise AssertionError(f"FakeLLM: no scripted response left for {schema['title']}")
@@ -49,7 +50,7 @@ class FakeLLM:
     def text(self, system: str, user: str) -> str:
         self.calls.append({"kind": "text", "system": system, "user": user})
         if self.fail:
-            raise LLMError("simulated outage")
+            raise LLMError(self.fail_message)
         return self.text_reply(system, user) if callable(self.text_reply) else self.text_reply
 
     def calls_of(self, kind: str) -> list[dict[str, Any]]:

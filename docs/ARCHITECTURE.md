@@ -46,6 +46,10 @@ LangGraph with the conversation's `thread_id`. Endpoints:
 - **Deterministic where possible, LLM where necessary.** Refusals, schema questions, validation, optimisation analysis, cost
   estimation and execution use no model calls. The model does classification, SQL writing, review and explanation.
 - **Structured outputs.** Every decision the graph branches on comes from a JSON-schema function call, not from parsing prose.
+  If a model answers in prose instead of calling the tool, the call is retried in the provider's native JSON-schema mode.
+- **Model fallback.** `FallbackLLM` tries `LLM_MODEL` first and then each of `LLM_FALLBACK_MODELS`. Free tiers have per-model
+  daily quotas, so a rate-limited model is skipped for 60 seconds and the SDK's own retry-and-wait is switched off for every
+  model that has a fallback behind it. If every model is limited, the user sees a plain "usage limit" message.
 - **Provider-agnostic.** `init_chat_model("provider:model")` means OpenAI, Groq, Anthropic or Gemini work by changing `LLM_MODEL`
   and installing the matching `langchain-*` package. Graph nodes depend only on a two-method `LLMClient` protocol, which is also
   what lets the tests run offline with a scripted fake model.

@@ -18,6 +18,8 @@ ROOT = Path(__file__).resolve().parent.parent
 class Settings:
     database_path: Path = ROOT / "data" / "sample.db"
     llm_model: str = "groq:openai/gpt-oss-120b"
+    # Tried in order when the main model fails, e.g. its free-tier daily quota is used up.
+    llm_fallback_models: tuple[str, ...] = ("groq:openai/gpt-oss-20b",)
     llm_temperature: float = 0.0
     max_result_rows: int = 200          # rows shown in the UI per query
     max_export_rows: int = 10_000       # rows written to a CSV export
@@ -32,6 +34,9 @@ class Settings:
         return cls(
             database_path=Path(env("DATABASE_PATH", str(cls.database_path))),
             llm_model=env("LLM_MODEL", cls.llm_model),
+            llm_fallback_models=tuple(
+                m.strip() for m in env("LLM_FALLBACK_MODELS", ",".join(cls.llm_fallback_models)).split(",")
+                if m.strip()),
             llm_temperature=float(env("LLM_TEMPERATURE", cls.llm_temperature)),
             max_result_rows=int(env("MAX_RESULT_ROWS", cls.max_result_rows)),
             max_export_rows=int(env("MAX_EXPORT_ROWS", cls.max_export_rows)),

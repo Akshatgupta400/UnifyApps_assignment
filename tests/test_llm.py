@@ -1,6 +1,6 @@
 import unittest
 
-from app.agent.llm import LangChainLLM, LLMError, fill_missing
+from app.agent.llm import FallbackLLM, LangChainLLM, LLMError, fill_missing
 from app.agent.prompts import GENERATE_SCHEMA, INTENT_SCHEMA
 
 
@@ -66,3 +66,75 @@ class StructuredFallbackTests(unittest.TestCase):
         llm.STRUCTURED_METHODS = ("function_calling",)
         with self.assertRaises(LLMError):
             llm.structured("system", "user", INTENT_SCHEMA)
+
+
+class _ScriptedClient:
+    def __init__(self, name, error=None):
+        self.model_name, self.error, self.calls = name, error, 0
+
+    def structured(self, system, user, schema):
+        self.calls += 1
+        if self.error:
+            raise LLMError(self.error)
+        return {"intent": "generate", "model": self.model_name}
+
+    def text(self, system, user):
+        self.calls += 1
+        if self.error:
+            raise LLMError(self.error)
+        return self.model_name
+
+
+RATE_LIMITED = "Error code: 429 - Rate limit reached for model on tokens per day (TPD)"
+
+
+class FallbackLLMTests(unittest.TestCase):
+    def test_uses_the_next_model_when_the_first_is_rate_limited(self):
+        first, second = _ScriptedClient("big", RATE_LIMITED), _ScriptedClient("small")
+        llm = FallbackLLM([first, second])
+        self.assertEqual(llm.structured("s", "u", INTENT_SCHEMA)["model"], "small")
+        self.assertEqual(llm.text("s", "u"), "small")
+        self.assertEqual(llm.model_name, "big")
+
+    def test_first_model_is_used_when_it_works(self):
+        first, second = _ScriptedClient("big"), _ScriptedClient("small")
+        self.assertEqual(FallbackLLM([first, second]).text("s", "u"), "big")
+        self.assertEqual(second.calls, 0)
+
+    def test_all_rate_limited_is_reported_as_rate_limit(self):
+        llm = FallbackLLM([_ScriptedClient("a", RATE_LIMITED), _ScriptedClient("b", RATE_LIMITED)])
+        with self.assertRaises(LLMError) as ctx:
+            llm.text("s", "u")
+        self.assertTrue(str(ctx.exception).startswith("RATE_LIMIT"))
+
+    def test_other_errors_are_passed_through(self):
+        llm = FallbackLLM([_ScriptedClient("a", RATE_LIMITED), _ScriptedClient("b", "Invalid API Key")])
+        with self.assertRaises(LLMError) as ctx:
+            llm.text("s", "u")
+        self.assertIn("Invalid API Key", str(ctx.exception))
+
+    def test_rate_limited_model_rests_during_cooldown(self):
+        first, second = _ScriptedClient("big", RATE_LIMITED), _ScriptedClient("small")
+        llm = FallbackLLM([first, second], cooldown_seconds=60)
+        llm.text("s", "u")
+        llm.text("s", "u")
+        self.assertEqual(first.calls, 1)    # not retried while resting
+        self.assertEqual(second.calls, 2)
+
+    def test_resting_models_are_still_tried_when_nothing_else_works(self):
+        first, second = _ScriptedClient("big", RATE_LIMITED), _ScriptedClient("small", RATE_LIMITED)
+        llm = FallbackLLM([first, second], cooldown_seconds=60)
+        for _ in range(2):
+            with self.assertRaises(LLMError):
+                llm.text("s", "u")
+        self.assertEqual((first.calls, second.calls), (2, 2))
+
+    def test_rate_limit_skips_the_json_schema_retry(self):
+        llm = LangChainLLM.__new__(LangChainLLM)
+        llm._model = _FakeChatModel()
+        llm._model.with_structured_output = lambda schema, method: (
+            llm._model.methods.append(method) or _FakeRunnable(RuntimeError(RATE_LIMITED)))
+        llm._structured_cache = {}
+        with self.assertRaises(LLMError):
+            llm.structured("s", "u", INTENT_SCHEMA)
+        self.assertEqual(llm._model.methods, ["function_calling"])

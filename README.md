@@ -5,6 +5,8 @@ database. Ask a question in plain English and get a validated, read-only SQL que
 results. You can also paste SQL to have it explained, debugged or optimised. Anything that is not about SQL or this database
 is refused.
 
+**Live demo:** https://sql-agent-ac2e.onrender.com (free hosting: the first request after a quiet period takes about a minute)
+
 **Demo video:** _link to be added_
 
 ![Architecture](docs/architecture.png)
@@ -84,6 +86,7 @@ to rebuild it later, run `python -m app.db.seed`. Stop the server with <kbd>Ctrl
 |---|---|
 | Yellow banner "The language model isn't configured" | `.env` is missing, or the key is wrong. Check `/api/health` for details, then restart the server. |
 | `model ... does not exist or you do not have access to it` | Groq retires models over time. List the models your key can use with `curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"`, and set `LLM_MODEL=groq:<model id>`. |
+| "The AI model has reached its free-tier usage limit" | Groq's free plan allows about 200,000 tokens per model per day (roughly 80 questions). The app already switches to `LLM_FALLBACK_MODELS` when the main model is limited; if every model is limited, wait a few minutes or use a paid key. |
 | `Address already in use` | Another program is using port 8000. Set `PORT=8001` in `.env`, or stop the other program. |
 | `ModuleNotFoundError` | The virtual environment isn't active. Run `source .venv/bin/activate` (or run `.venv/bin/python run.py` directly). |
 | `python: command not found` (macOS) | Use `python3`. Inside an activated virtual environment, `python` works. |
@@ -199,7 +202,8 @@ run.py       entry point
 
 ## Configuration
 
-All settings are environment variables (see `.env.example`): `LLM_MODEL`, `LLM_TEMPERATURE` (default 0), `DATABASE_PATH`,
+All settings are environment variables (see `.env.example`): `LLM_MODEL`, `LLM_FALLBACK_MODELS` (default
+`groq:openai/gpt-oss-20b`, tried when the main model fails or is rate-limited), `LLM_TEMPERATURE` (default 0), `DATABASE_PATH`,
 `AUTO_EXECUTE`, `MAX_RESULT_ROWS` (200), `MAX_EXPORT_ROWS` (10,000), `QUERY_TIMEOUT_SECONDS` (5), `MAX_SQL_ATTEMPTS` (3),
 `HISTORY_TURNS` (6), `HOST`, `PORT`.
 

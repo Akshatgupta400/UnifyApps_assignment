@@ -3,6 +3,7 @@ import unittest
 import uuid
 
 from app.agent.graph import build_graph
+from app.agent.llm import FallbackLLM
 from app.agent.prompts import DESTRUCTIVE_MESSAGE, INJECTION_MESSAGE, OUT_OF_SCOPE_MESSAGE
 from app.agent.state import new_turn
 from tests.fakes import FakeLLM, draft, intent, review
@@ -253,6 +254,16 @@ class InfoAndErrorTests(GraphTestCase):
         r = self.ask("Show all customers")
         self.assertEqual(r["type"], "error")
         self.assertIn("language model", r["message"])
+
+    def test_rate_limit_on_every_model_gets_a_friendly_message(self):
+        limited = "Error code: 429 - Rate limit reached on tokens per day (TPD)"
+        llm = FallbackLLM([FakeLLM(fail=True, fail_message=limited),
+                           FakeLLM(fail=True, fail_message=limited)])
+        graph = build_graph(llm, sample_schema(), settings())
+        state = graph.invoke(new_turn("Show all customers"), {"configurable": {"thread_id": "rl"}})
+        self.assertEqual(state["response"]["type"], "error")
+        self.assertIn("usage limit", state["response"]["message"])
+        self.assertNotIn("429", state["response"]["message"])
 
     def test_missing_llm_configuration(self):
         graph = build_graph(None, sample_schema(), settings(), llm_error="OPENAI_API_KEY is not set")

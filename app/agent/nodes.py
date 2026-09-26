@@ -271,7 +271,11 @@ class AgentNodes:
         notes = state.get("notes") or {}
         final_sql = ""
 
-        if state.get("error"):
+        if state.get("error", "").startswith("RATE_LIMIT"):
+            response = {"type": "error",
+                        "message": "The AI model has reached its free-tier usage limit for now, so I "
+                                   "can't answer this one. Please try again in a few minutes."}
+        elif state.get("error"):
             response = {"type": "error",
                         "message": "I couldn't reach the language model, so I can't answer right now. "
                                    f"Details: {state['error']}"}

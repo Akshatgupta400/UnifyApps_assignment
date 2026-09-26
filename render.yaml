@@ -11,5 +11,7 @@ services:
         sync: false          # secret: entered in the Render dashboard, never committed
       - key: LLM_MODEL
         value: groq:openai/gpt-oss-120b
+      - key: LLM_FALLBACK_MODELS
+        value: groq:openai/gpt-oss-20b
       - key: AUTO_EXECUTE
         value: "true"
