@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SQL Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+  <script>
+    try { if (localStorage.getItem("theme") === "dark") document.documentElement.dataset.theme = "dark"; } catch (e) {}
+  </script>
+</head>
+<body>
+<div class="app">
+  <!-- Left rail: conversations and schema -->
+  <aside class="rail" id="rail" aria-label="Conversations and schema">
+    <div class="rail-head">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7.5" ry="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 5.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6M4.5 11.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span>SQL Assistant</span>
+      </div>
+      <button class="btn btn-primary btn-block" id="newChat" type="button">New conversation</button>
+    </div>
+
+    <section class="rail-section">
+      <h2 class="rail-title">History</h2>
+      <ul class="session-list" id="sessionList"></ul>
+      <p class="rail-empty" id="sessionEmpty">Your conversations appear here.</p>
+    </section>
+
+    <section class="rail-section rail-schema">
+      <h2 class="rail-title">Database</h2>
+      <p class="rail-note" id="dbNote">Loading schema…</p>
+      <div id="schemaTree"></div>
+    </section>
+
+    <div class="rail-foot">
+      <button class="btn btn-ghost" id="themeToggle" type="button" aria-pressed="false">Dark mode</button>
+    </div>
+  </aside>
+
+  <!-- Centre: chat -->
+  <main class="chat" aria-label="Chat">
+    <header class="chat-head">
+      <button class="btn btn-ghost rail-toggle" id="railToggle" type="button" aria-controls="rail" aria-expanded="false">Menu</button>
+      <h1 id="chatTitle">New conversation</h1>
+      <button class="btn btn-ghost sheet-toggle" id="sheetToggle" type="button" aria-controls="sheet">Query</button>
+    </header>
+
+    <div class="banner" id="banner" role="alert" hidden></div>
+
+    <div class="messages" id="messages" aria-live="polite">
+      <div class="welcome" id="welcome">
+        <h2>Ask the database a question</h2>
+        <p>Describe what you want to see in plain English. You'll get read-only SQL, a plain-English
+          explanation, validation checks and the results. You can also paste a query to explain, debug or optimize.</p>
+        <div class="examples" id="examples">
+          <button type="button" class="example">Show all employees hired after January 2024.</button>
+          <button type="button" class="example">Show all customers.</button>
+          <button type="button" class="example">Top 5 products by revenue in 2024</button>
+          <button type="button" class="example">Average salary by department, highest first</button>
+          <button type="button" class="example">Fix this: SELECT FirstName, Salry FROM Employee WHERE HireDate > 2024</button>
+          <button type="button" class="example">Optimize: SELECT * FROM Orders o JOIN Customers c ON o.CustomerId = c.CustomerId LEFT JOIN Employees e ON e.EmployeeId = o.EmployeeId WHERE strftime('%Y', o.OrderDate) = '2024'</button>
+        </div>
+      </div>
+    </div>
+
+    <form class="composer" id="composer" autocomplete="off">
+      <label class="visually-hidden" for="input">Message</label>
+      <textarea id="input" rows="1" maxlength="4000" placeholder="Ask about employees, customers, products or orders…"></textarea>
+      <div class="composer-row">
+        <label class="toggle"><input type="checkbox" id="execute" checked> Run query on the sample data</label>
+        <span class="hint">Enter to send, Shift+Enter for a new line</span>
+        <button class="btn btn-primary" id="send" type="submit">Send</button>
+      </div>
+    </form>
+  </main>
+
+  <!-- Right: query sheet -->
+  <section class="sheet" id="sheet" aria-label="Query details">
+    <div class="pipeline" id="pipeline" aria-label="Agent progress">
+      <ol class="track" id="track"></ol>
+      <p class="pipeline-status" id="pipelineStatus" role="status">Waiting for a question.</p>
+    </div>
+
+    <div class="sheet-body" id="sheetBody">
+      <div class="sheet-empty" id="sheetEmpty">
+        <p>The SQL for your question, its explanation and results will appear here.</p>
+      </div>
+
+      <div id="sheetContent" hidden>
+        <section class="panel" aria-labelledby="sqlHeading">
+          <div class="panel-head">
+            <h2 id="sqlHeading">SQL</h2>
+            <span class="badge" id="validBadge"></span>
+            <div class="panel-actions">
+              <button class="btn btn-small" id="copySql" type="button">Copy SQL</button>
+              <button class="btn btn-small" id="downloadSql" type="button">Download .sql</button>
+            </div>
+          </div>
+          <pre class="sql" id="sqlOut"><code></code></pre>
+          <details class="original" id="originalBox" hidden>
+            <summary>Your original query</summary>
+            <pre class="sql sql-muted" id="originalSql"><code></code></pre>
+          </details>
+        </section>
+
+        <section class="panel" aria-labelledby="explainHeading">
+          <div class="panel-head"><h2 id="explainHeading">What this query does</h2></div>
+          <p class="explanation" id="explanation"></p>
+          <div id="notes"></div>
+        </section>
+
+        <section class="panel panel-tabs">
+          <div class="tabs" role="tablist">
+            <button role="tab" class="tab" id="tabResults" aria-selected="true" aria-controls="paneResults" type="button">Results</button>
+            <button role="tab" class="tab" id="tabChecks" aria-selected="false" aria-controls="paneChecks" type="button">Checks</button>
+            <button role="tab" class="tab" id="tabPerf" aria-selected="false" aria-controls="panePerf" type="button">Performance</button>
+          </div>
+          <div class="tabpane" role="tabpanel" id="paneResults" aria-labelledby="tabResults"></div>
+          <div class="tabpane" role="tabpanel" id="paneChecks" aria-labelledby="tabChecks" hidden></div>
+          <div class="tabpane" role="tabpanel" id="panePerf" aria-labelledby="tabPerf" hidden></div>
+        </section>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

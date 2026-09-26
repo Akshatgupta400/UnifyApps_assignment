@@ -1,0 +1,15 @@
+# Orchestration (LangGraph + LangChain)
+langgraph>=0.4,<2
+langchain>=0.3,<2
+langchain-core>=0.3,<2
+# Default model provider (LLM_MODEL=openai:gpt-4o-mini).
+langchain-openai>=0.3
+# Optional providers - uncomment the one you want to use instead:
+# langchain-groq>=0.3        # LLM_MODEL=groq:openai/gpt-oss-120b
+# langchain-anthropic>=0.3   # LLM_MODEL=anthropic:claude-sonnet-4-5
+# langchain-google-genai>=2  # LLM_MODEL=google_genai:gemini-2.0-flash
+
+# Web backend
+flask>=3.0,<4
+gunicorn>=22 ; platform_system != "Windows"
+python-dotenv>=1.0

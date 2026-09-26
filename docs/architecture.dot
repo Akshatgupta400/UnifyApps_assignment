@@ -1,0 +1,57 @@
+digraph G {
+  graph [rankdir=LR, fontname="Helvetica", fontsize=12, nodesep=0.35, ranksep=0.5, bgcolor="white", pad=0.3];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, fillcolor="#eef2fb", color="#3b5bdb"];
+  edge  [fontname="Helvetica", fontsize=9, color="#555555"];
+
+  subgraph cluster_ui { label="Browser (vanilla JS)"; style="rounded"; color="#999999";
+    ui [label="Chat + history\nSQL panel (highlight, copy, .sql)\nExplanation panel\nResults / Checks / Performance\nCSV export, dark mode"]; }
+
+  subgraph cluster_api { label="Flask backend (app/server.py)"; style="rounded"; color="#999999";
+    api [label="REST + SSE\n/api/chat/stream  /api/chat\n/api/sessions  /api/schema\n/api/export/csv  /api/graph"];
+    store [label="Session store\n(thread_id per conversation)"]; }
+
+  subgraph cluster_agent { label="LangGraph StateGraph (app/agent/graph.py)"; style="rounded"; color="#3b5bdb";
+    guard [label="guard_input\n(injection, destructive,\nlength)"];
+    intent [label="classify_intent\n(intent + scope)"];
+    refuse [label="refuse", fillcolor="#fff3d6", color="#c08a00"];
+    clarify [label="clarify / answer_info", fillcolor="#fff3d6", color="#c08a00"];
+    schema [label="retrieve_schema"];
+    gen [label="generate_sql\n(new / refine)"];
+    review [label="review_sql\n(explain / debug / optimize)"];
+    validate [label="validate_sql"];
+    optimize [label="optimize"];
+    exec [label="execute_sql"];
+    explain [label="explain"];
+    respond [label="respond", fillcolor="#e3f5e8", color="#2b8a3e"];
+    ckpt [label="InMemorySaver\ncheckpointer\n(history, last_sql)", shape=cylinder, fillcolor="#f5f5f5", color="#777777"];
+  }
+
+  subgraph cluster_tools { label="SQL toolkit (app/sql, app/db)"; style="rounded"; color="#999999";
+    validator [label="Validator\nSQLite EXPLAIN compile\nread-only authorizer\nFK relationship check"];
+    opt [label="Optimizer\nEXPLAIN QUERY PLAN\nindex advice, cost estimate"];
+    executor [label="Executor\nread-only, row cap,\ntimeout"];
+    intro [label="Schema introspection"];
+    db [label="SQLite\ndata/sample.db", shape=cylinder, fillcolor="#f5f5f5", color="#777777"];
+  }
+  llm [label="LLM via LangChain\ninit_chat_model()\n(OpenAI / Groq / Anthropic / Gemini)", fillcolor="#f3e8ff", color="#7048e8"];
+
+  ui -> api [label="HTTP / SSE"];
+  api -> store; api -> guard [label="invoke / stream"];
+  guard -> intent; guard -> refuse [style=dashed, label="blocked"];
+  intent -> refuse [style=dashed, label="out of scope /\ndestructive"];
+  intent -> clarify [style=dashed];
+  intent -> schema;
+  schema -> gen; schema -> review;
+  gen -> validate; review -> validate;
+  validate -> gen [style=dashed, label="errors, retry ≤2", constraint=false];
+  validate -> refuse [style=dashed, label="write detected", constraint=false];
+  validate -> respond [style=dashed, label="retries used up", constraint=false];
+  validate -> optimize; optimize -> exec; optimize -> explain; exec -> explain; explain -> respond;
+  refuse -> respond; clarify -> respond;
+  respond -> ckpt [style=dotted, arrowhead=none];
+
+  intent -> llm [style=dotted, color="#7048e8"]; gen -> llm [style=dotted, color="#7048e8"];
+  review -> llm [style=dotted, color="#7048e8"]; explain -> llm [style=dotted, color="#7048e8"];
+  validate -> validator [style=dotted]; optimize -> opt [style=dotted]; exec -> executor [style=dotted]; schema -> intro [style=dotted];
+  validator -> db; opt -> db; executor -> db; intro -> db;
+}

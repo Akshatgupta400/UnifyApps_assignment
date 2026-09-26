@@ -1,0 +1,11 @@
+services:
+  sql-agent:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      DATABASE_PATH: /app/data/sample.db
+    restart: unless-stopped
