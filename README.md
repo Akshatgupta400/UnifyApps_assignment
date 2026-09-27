@@ -7,7 +7,7 @@ is refused.
 
 **Live demo:** https://sql-agent-ac2e.onrender.com (free hosting: the first request after a quiet period takes about a minute)
 
-**Demo video:** _link to be added_
+**Demo video:** [watch on Google Drive](https://drive.google.com/file/d/183RFw6Fy0ZkzymfoUZC6Vumqd0j9e__N/view?usp=drive_link)
 
 ![Architecture](docs/architecture.png)
 
